@@ -1,3 +1,4 @@
+// Re-validated: Pattern A* (workspace-only) on 2026-04-21
 // Validated: Pattern C cross-repo config
 import 'dotenv/config';
 import { z } from 'zod';
