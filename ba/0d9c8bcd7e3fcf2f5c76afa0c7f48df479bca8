@@ -1,0 +1,23 @@
+src/utils/local-storage-test.ts
+  1612649c4bf0b88e 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "ba0d9c8bcd7e3fcf2f5c76afa0c7f48df479bca8",
+  "prompts": {
+    "1612649c4bf0b88e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9b4e6eb7-f49a-48c2-b519-1842319d6fe1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Dmytro Shamsiiev",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
