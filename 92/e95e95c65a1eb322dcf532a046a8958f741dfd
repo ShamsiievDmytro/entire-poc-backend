@@ -1,0 +1,90 @@
+src/config.ts
+  f8553b7b4c5fd899 1-20
+src/db/schema.sql
+  f8553b7b4c5fd899 1-60
+src/ingestion/orchestrator.ts
+  f8553b7b4c5fd899 1-155
+.claude/settings.json
+  f8553b7b4c5fd899 1-15
+tsconfig.json
+  f8553b7b4c5fd899 1-19
+src/utils/time.ts
+  f8553b7b4c5fd899 1-5
+src/api/routes/charts.ts
+  f8553b7b4c5fd899 1-99
+.env.example
+  f8553b7b4c5fd899 1-7
+src/api/routes/status.ts
+  f8553b7b4c5fd899 1-29
+src/db/types.ts
+  f8553b7b4c5fd899 1-52
+src/api/routes/ingest.ts
+  f8553b7b4c5fd899 1-27
+src/domain/session-joiner.ts
+  f8553b7b4c5fd899 1-87
+tests/path-resolver.test.ts
+  f8553b7b4c5fd899 1-66
+src/api/routes/sessions.ts
+  f8553b7b4c5fd899 1-62
+src/db/repo-checkpoints-repo.ts
+  f8553b7b4c5fd899 1-34
+src/utils/logger.ts
+  f8553b7b4c5fd899 1-9
+src/ingestion/checkpoint-fetcher.ts
+  f8553b7b4c5fd899 1-103
+src/api/middleware/error.ts
+  f8553b7b4c5fd899 1-7
+src/api/server.ts
+  f8553b7b4c5fd899 1-24
+package.json
+  f8553b7b4c5fd899 1-41
+src/db/session-links-repo.ts
+  f8553b7b4c5fd899 1-26
+src/ingestion/github-client.ts
+  f8553b7b4c5fd899 1-11
+.gitignore
+  f8553b7b4c5fd899 1-7
+.entire/settings.json
+  f8553b7b4c5fd899 1-10
+src/ingestion/metadata-parser.ts
+  f8553b7b4c5fd899 1-69
+src/domain/path-resolver.ts
+  f8553b7b4c5fd899 1-33
+src/db/migrations.ts
+  f8553b7b4c5fd899 1-17
+src/db/sessions-repo.ts
+  f8553b7b4c5fd899 1-38
+src/ingestion/jsonl-parser.ts
+  f8553b7b4c5fd899 1-131
+src/index.ts
+  f8553b7b4c5fd899 1-11
+README.md
+  f8553b7b4c5fd899 2-57
+eslint.config.js
+  f8553b7b4c5fd899 1-22
+src/db/session-touches-repo.ts
+  f8553b7b4c5fd899 1-25
+tests/session-joiner.test.ts
+  f8553b7b4c5fd899 1-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "92e95e95c65a1eb322dcf532a046a8958f741dfd",
+  "prompts": {
+    "f8553b7b4c5fd899": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88b279c9-4a9f-46cf-a09f-133755f7770c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dmytro Shamsiiev",
+      "messages": [],
+      "total_additions": 1512,
+      "total_deletions": 11,
+      "accepted_lines": 1501,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/89be4f6853ca1f3f70a8f5bed2f2c2c6329938501e2a92f0a7f9f22578793bca"
+    }
+  }
+}
