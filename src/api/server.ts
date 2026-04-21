@@ -13,6 +13,11 @@ export function createServer(db: Database.Database) {
   app.use(cors());
   app.use(express.json());
 
+  // Health check endpoint
+  app.get('/api/health', (_req, res) => {
+    res.json({ ok: true, uptime: process.uptime() });
+  });
+
   app.use('/api', statusRoutes(db));
   app.use('/api', ingestRoutes(db));
   app.use('/api', chartRoutes(db));
