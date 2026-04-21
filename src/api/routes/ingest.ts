@@ -22,12 +22,18 @@ export async function runIngestionCycle(db: Database.Database): Promise<Ingestio
   }
 }
 
-export function ingestRoutes(_db: Database.Database): Router {
+export function ingestRoutes(db: Database.Database): Router {
   const router = Router();
 
-  router.post('/ingest/run', (_req, res) => {
+  router.post('/ingest/run', async (_req, res) => {
     const jobId = randomUUID();
-    res.json({ jobId, startedAt: new Date().toISOString(), ...lastReport });
+    try {
+      const report = await runIngestionCycle(db);
+      res.json({ jobId, startedAt: new Date().toISOString(), ...report });
+    } catch (err) {
+      log('error', 'Manual ingestion trigger failed', { error: String(err) });
+      res.status(500).json({ jobId, error: 'Ingestion failed' });
+    }
   });
 
   return router;

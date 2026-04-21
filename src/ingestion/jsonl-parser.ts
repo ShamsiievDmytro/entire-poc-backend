@@ -1,5 +1,6 @@
 import { resolveRepoFromAbsolutePath, relativePathFromRepo } from '../domain/path-resolver.js';
 import { parseTimestamp } from '../utils/time.js';
+import { log } from '../utils/logger.js';
 
 export interface ParsedSession {
   sessionId: string;
@@ -24,13 +25,21 @@ interface JsonlParseOptions {
 export function parseJsonl(jsonlText: string, opts: JsonlParseOptions): ParsedSession {
   const lines = jsonlText.split('\n').filter((l) => l.trim());
   const events: Record<string, unknown>[] = [];
+  let malformedCount = 0;
 
   for (const line of lines) {
     try {
       events.push(JSON.parse(line));
     } catch {
-      // Skip malformed lines
+      malformedCount++;
     }
+  }
+
+  if (malformedCount > 0) {
+    log('warn', `Skipped ${malformedCount} malformed JSONL lines`, {
+      sessionIdOverride: opts.sessionIdOverride,
+      totalLines: lines.length,
+    });
   }
 
   let sessionId = opts.sessionIdOverride || '';
@@ -127,8 +136,8 @@ export function parseJsonl(jsonlText: string, opts: JsonlParseOptions): ParsedSe
     if (topToolName) {
       const anyPath = topFilePath ||
         (toolResult?.filePath || toolResult?.file_path ||
-         (toolResult?.file as Record<string, unknown> | undefined)?.filePath) as string | undefined;
-      recordToolCall(topToolName, (anyPath as string) || null);
+         (toolResult?.file as Record<string, unknown> | undefined)?.filePath);
+      recordToolCall(topToolName, typeof anyPath === 'string' ? anyPath : null);
     }
 
     // Slash commands

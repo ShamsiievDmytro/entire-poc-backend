@@ -62,7 +62,7 @@ export async function fetchRepoCommitsInWindow(
       });
     }
   } catch (err) {
-    log('warn', `Failed to list commits for ${owner}/${repo}`, { error: String(err) });
+    log('error', `Failed to list commits for ${owner}/${repo}`, { error: String(err) });
   }
 
   return commits;

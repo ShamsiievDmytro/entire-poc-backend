@@ -55,7 +55,12 @@ export function computeLinks(
       commitTime <= sessionWindowEnd + FIVE_MIN_MS;
 
     if (within5) {
-      const ckptFiles: string[] = JSON.parse(ckpt.files_touched_json || '[]');
+      let ckptFiles: string[];
+      try {
+        ckptFiles = JSON.parse(ckpt.files_touched_json || '[]');
+      } catch {
+        ckptFiles = [];
+      }
       const overlap = ckptFiles.some((f) => filesTouchedBySession.has(f));
       if (overlap) {
         links.push({

@@ -7,21 +7,3 @@ export function log(level: 'info' | 'warn' | 'error', message: string, data?: Re
   };
   console.log(JSON.stringify(entry));
 }
-
-export function logDebug(msg: string) {
-  if (process.env.DEBUG) {
-    console.debug(msg);
-  }
-}
-
-export function logWarn(msg: string) {
-  console.warn(msg);
-}
-
-export function logTrace(msg: string) {
-  if (process.env.TRACE) console.trace(msg);
-}
-
-export function logFatal(msg: string) {
-  console.error('[FATAL]', msg);
-}

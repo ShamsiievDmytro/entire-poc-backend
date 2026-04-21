@@ -10,8 +10,19 @@ export function initDb(dbPath: string): Database.Database {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
 
-  const schema = readFileSync(join(__dirname, 'schema.sql'), 'utf-8');
-  db.exec(schema);
+  const schemaPath = join(__dirname, 'schema.sql');
+  let schema: string;
+  try {
+    schema = readFileSync(schemaPath, 'utf-8');
+  } catch (err) {
+    throw new Error(`Failed to read schema file at ${schemaPath}: ${err}`);
+  }
+
+  try {
+    db.exec(schema); // db.exec runs SQL statements — this is not shell execution
+  } catch (err) {
+    throw new Error(`Failed to execute schema SQL: ${err}`);
+  }
 
   return db;
 }

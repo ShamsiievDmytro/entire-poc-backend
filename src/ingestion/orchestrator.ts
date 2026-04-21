@@ -116,12 +116,12 @@ export async function runIngestion(db: Database.Database): Promise<IngestionRepo
   } catch (err) {
     const errObj = err as { status?: number; message?: string; request?: { url?: string } };
     const msg = `Error ingesting workspace: ${err}`;
-    console.error('[INGESTION ERROR]', workspaceRepo, {
+    log('error', msg, {
+      repo: workspaceRepo,
       message: errObj.message,
       status: errObj.status,
       url: errObj.request?.url,
     });
-    log('error', msg);
     errors.push(msg);
   }
 
@@ -138,7 +138,13 @@ export async function runIngestion(db: Database.Database): Promise<IngestionRepo
     // 1. Workspace self-links (original checkpoint-based approach)
     const allFilesTouched = new Set<string>();
     for (const touch of sessionTouches) {
-      const files: string[] = JSON.parse(touch.files_touched_json);
+      let files: string[];
+      try {
+        files = JSON.parse(touch.files_touched_json);
+      } catch {
+        log('warn', 'Corrupt files_touched_json in session touch', { session_id: session.session_id, repo: touch.repo });
+        continue;
+      }
       for (const f of files) allFilesTouched.add(f);
     }
 
@@ -177,7 +183,13 @@ export async function runIngestion(db: Database.Database): Promise<IngestionRepo
       // Skip workspace — already handled by checkpoint-based links above
       if (touch.repo === workspaceRepo) continue;
 
-      const repoFiles: string[] = JSON.parse(touch.files_touched_json);
+      let repoFiles: string[];
+      try {
+        repoFiles = JSON.parse(touch.files_touched_json);
+      } catch {
+        log('warn', 'Corrupt files_touched_json in session touch', { session_id: session.session_id, repo: touch.repo });
+        continue;
+      }
       const repoFileSet = new Set(repoFiles);
 
       try {

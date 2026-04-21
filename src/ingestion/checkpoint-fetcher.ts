@@ -1,24 +1,17 @@
-import { Octokit } from '@octokit/rest';
-import { config } from '../config.js';
 import { log } from '../utils/logger.js';
-
-export interface CheckpointFile {
-  path: string;
-  content: string;
-}
+import { getOctokit } from './github-client.js';
 
 export interface RawCheckpoint {
   checkpointId: string;
   metadataJson: string | null;
   sessionFiles: { sessionId: string; jsonlText: string }[];
-  allFiles: CheckpointFile[];
 }
 
 export async function fetchCheckpointBranch(
   owner: string,
   repo: string,
 ): Promise<RawCheckpoint[]> {
-  const octokit = new Octokit({ auth: config.GITHUB_TOKEN });
+  const octokit = getOctokit();
   const branch = 'entire/checkpoints/v1';
 
   let tree: { path?: string; sha?: string; type?: string }[];
@@ -79,11 +72,8 @@ export async function fetchCheckpointBranch(
   for (const [checkpointId, data] of checkpointMap) {
     let metadataJson: string | null = null;
     const sessionFiles: { sessionId: string; jsonlText: string }[] = [];
-    const allFiles: CheckpointFile[] = [];
 
     for (const [path, content] of data.files) {
-      allFiles.push({ path, content });
-
       if (path.endsWith('metadata.json')) {
         metadataJson = content;
       } else if (path.endsWith('full.jsonl')) {
@@ -97,7 +87,7 @@ export async function fetchCheckpointBranch(
       }
     }
 
-    checkpoints.push({ checkpointId, metadataJson, sessionFiles, allFiles });
+    checkpoints.push({ checkpointId, metadataJson, sessionFiles });
   }
 
   log('info', `Fetched ${checkpoints.length} checkpoints from ${repo}`);

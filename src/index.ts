@@ -13,8 +13,16 @@ app.listen(config.PORT, async () => {
   // Run initial ingestion
   await runIngestionCycle(db);
 
-  // Schedule periodic ingestion
-  setInterval(() => {
-    runIngestionCycle(db);
-  }, config.INGESTION_INTERVAL_MS);
+  // Schedule periodic ingestion using recursive setTimeout to prevent overlap
+  function scheduleNext() {
+    setTimeout(async () => {
+      try {
+        await runIngestionCycle(db);
+      } catch (err) {
+        log('error', 'Scheduled ingestion failed', { error: String(err) });
+      }
+      scheduleNext();
+    }, config.INGESTION_INTERVAL_MS);
+  }
+  scheduleNext();
 });

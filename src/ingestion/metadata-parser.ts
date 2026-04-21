@@ -1,4 +1,5 @@
 import { parseTimestamp } from '../utils/time.js';
+import { log } from '../utils/logger.js';
 
 export interface ParsedMetadata {
   sessionId: string | null;
@@ -20,26 +21,33 @@ export interface ParsedMetadata {
   } | null;
 }
 
-export function parseMetadata(raw: string | null): ParsedMetadata {
-  if (!raw) {
-    return {
-      sessionId: null,
-      checkpointId: null,
-      commitSha: null,
-      committedAt: null,
-      agent: null,
-      model: null,
-      agentPercentage: null,
-      agentLines: null,
-      humanAdded: null,
-      humanModified: null,
-      humanRemoved: null,
-      filesTouched: [],
-      summary: null,
-    };
-  }
+const NULL_METADATA: ParsedMetadata = {
+  sessionId: null,
+  checkpointId: null,
+  commitSha: null,
+  committedAt: null,
+  agent: null,
+  model: null,
+  agentPercentage: null,
+  agentLines: null,
+  humanAdded: null,
+  humanModified: null,
+  humanRemoved: null,
+  filesTouched: [],
+  summary: null,
+};
 
-  const data = JSON.parse(raw);
+export function parseMetadata(raw: string | null): ParsedMetadata {
+  if (!raw) return NULL_METADATA;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- external JSON with many optional shapes
+  let data: any;
+  try {
+    data = JSON.parse(raw);
+  } catch (err) {
+    log('warn', 'Failed to parse metadata JSON', { error: String(err), rawLength: raw.length });
+    return NULL_METADATA;
+  }
 
   const attribution = data.attribution || data.line_attribution || {};
   const summary = data.summary || null;
