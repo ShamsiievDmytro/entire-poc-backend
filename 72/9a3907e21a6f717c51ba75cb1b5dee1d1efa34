@@ -1,0 +1,24 @@
+src/api/routes/charts.ts
+  f8553b7b4c5fd899 98-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "729a3907e21a6f717c51ba75cb1b5dee1d1efa34",
+  "prompts": {
+    "f8553b7b4c5fd899": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88b279c9-4a9f-46cf-a09f-133755f7770c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dmytro Shamsiiev",
+      "messages": [],
+      "total_additions": 28,
+      "total_deletions": 21,
+      "accepted_lines": 28,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/ab184b9e2b8538fc05129f99f44b5466d86dd583f906ce99acda6a761f4a143b"
+    }
+  }
+}
