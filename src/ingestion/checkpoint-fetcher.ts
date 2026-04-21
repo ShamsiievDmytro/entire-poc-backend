@@ -1,4 +1,5 @@
-import { getOctokit } from './github-client.js';
+import { Octokit } from '@octokit/rest';
+import { config } from '../config.js';
 import { log } from '../utils/logger.js';
 
 export interface CheckpointFile {
@@ -17,11 +18,12 @@ export async function fetchCheckpointBranch(
   owner: string,
   repo: string,
 ): Promise<RawCheckpoint[]> {
-  const octokit = getOctokit();
+  const octokit = new Octokit({ auth: config.GITHUB_TOKEN });
   const branch = 'entire/checkpoints/v1';
 
   let tree: { path?: string; sha?: string; type?: string }[];
   try {
+    log('info', `Fetching tree for ${owner}/${repo}@${branch}`);
     const res = await octokit.rest.git.getTree({
       owner,
       repo,

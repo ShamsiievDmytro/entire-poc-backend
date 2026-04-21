@@ -1,26 +1,33 @@
 import { Router } from 'express';
 import type Database from 'better-sqlite3';
-import { runIngestion } from '../../ingestion/orchestrator.js';
+import { runIngestion, type IngestionReport } from '../../ingestion/orchestrator.js';
 import { setLastIngestionRun } from './status.js';
 import { log } from '../../utils/logger.js';
 import { randomUUID } from 'node:crypto';
 
-export function ingestRoutes(db: Database.Database): Router {
+let lastReport: IngestionReport = { sessions: 0, checkpoints: 0, links: 0, errors: [] };
+
+export async function runIngestionCycle(db: Database.Database): Promise<IngestionReport> {
+  try {
+    log('info', 'Ingestion cycle starting');
+    const report = await runIngestion(db);
+    setLastIngestionRun(new Date().toISOString());
+    lastReport = report;
+    log('info', 'Ingestion cycle complete', { sessions: report.sessions, checkpoints: report.checkpoints, links: report.links });
+    return report;
+  } catch (err) {
+    log('error', 'Ingestion cycle failed', { error: String(err) });
+    lastReport = { sessions: 0, checkpoints: 0, links: 0, errors: [String(err)] };
+    return lastReport;
+  }
+}
+
+export function ingestRoutes(_db: Database.Database): Router {
   const router = Router();
 
-  router.post('/ingest/run', async (_req, res) => {
+  router.post('/ingest/run', (_req, res) => {
     const jobId = randomUUID();
-    const startedAt = new Date().toISOString();
-    log('info', 'Ingestion triggered', { jobId });
-
-    try {
-      const report = await runIngestion(db);
-      setLastIngestionRun(new Date().toISOString());
-      res.json({ jobId, startedAt, ...report });
-    } catch (err) {
-      log('error', 'Ingestion failed', { error: String(err) });
-      res.status(500).json({ jobId, startedAt, error: String(err) });
-    }
+    res.json({ jobId, startedAt: new Date().toISOString(), ...lastReport });
   });
 
   return router;

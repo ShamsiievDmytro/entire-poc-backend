@@ -109,7 +109,13 @@ export async function runIngestion(db: Database.Database): Promise<IngestionRepo
         }
       }
     } catch (err) {
+      const errObj = err as { status?: number; message?: string; request?: { url?: string } };
       const msg = `Error ingesting ${repo}: ${err}`;
+      console.error('[INGESTION ERROR]', repo, {
+        message: errObj.message,
+        status: errObj.status,
+        url: errObj.request?.url,
+      });
       log('error', msg);
       errors.push(msg);
     }
