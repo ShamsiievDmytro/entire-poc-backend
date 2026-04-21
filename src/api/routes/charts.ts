@@ -155,6 +155,49 @@ export function chartRoutes(db: Database.Database): Router {
     }
   });
 
+  // Chart: Session Duration
+  const sessionDurationStmt = db.prepare(`
+    SELECT
+      s.session_id,
+      s.started_at,
+      s.ended_at,
+      s.agent
+    FROM sessions s
+    WHERE s.ended_at IS NOT NULL AND s.started_at IS NOT NULL
+  `);
+  const sessionReposStmt = db.prepare(`
+    SELECT DISTINCT repo FROM session_repo_touches WHERE session_id = ?
+  `);
+
+  router.get('/charts/session-duration', (_req, res) => {
+    try {
+      const sessions = sessionDurationStmt.all() as {
+        session_id: string;
+        started_at: string;
+        ended_at: string;
+        agent: string | null;
+      }[];
+
+      const result = sessions.map((s) => {
+        const start = new Date(s.started_at).getTime();
+        const end = new Date(s.ended_at).getTime();
+        const durationMinutes = Math.round(((end - start) / 60_000) * 10) / 10;
+        const repos = (sessionReposStmt.all(s.session_id) as { repo: string }[]).map((r) => r.repo);
+        return {
+          sessionId: s.session_id,
+          durationMinutes,
+          agent: s.agent ?? 'unknown',
+          repos,
+        };
+      });
+
+      res.json(result);
+    } catch (err) {
+      log('error', 'Chart session-duration failed', { error: String(err) });
+      res.status(500).json({ error: 'Failed to load chart data' });
+    }
+  });
+
   // Summary endpoint for cross-repo validation
   router.get('/charts/summary', (_req, res) => {
     res.json({ totalEndpoints: 10, description: "Cross-repo validation test" });
