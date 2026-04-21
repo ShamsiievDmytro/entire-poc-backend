@@ -1,3 +1,4 @@
+// Validated: Pattern C cross-repo config
 import 'dotenv/config';
 import { z } from 'zod';
 
