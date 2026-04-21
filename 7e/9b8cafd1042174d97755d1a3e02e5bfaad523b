@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "7e9b8cafd1042174d97755d1a3e02e5bfaad523b",
+  "prompts": {
+    "af6b953ce6ca42e5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "938d4ede-8c54-43c8-b6bd-7b5673e34a28",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Dmytro Shamsiiev",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 1,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
