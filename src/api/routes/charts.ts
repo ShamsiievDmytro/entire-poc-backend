@@ -138,6 +138,23 @@ export function chartRoutes(db: Database.Database): Router {
     }
   });
 
+  // Chart: Avg Files Touched per Session
+  const filesPerSessionStmt = db.prepare(`
+    SELECT session_id as sessionId, SUM(json_array_length(files_touched_json)) as filesCount
+    FROM session_repo_touches
+    GROUP BY session_id
+    ORDER BY filesCount DESC
+  `);
+
+  router.get('/charts/files-per-session', (_req, res) => {
+    try {
+      res.json(filesPerSessionStmt.all());
+    } catch (err) {
+      log('error', 'Chart files-per-session failed', { error: String(err) });
+      res.status(500).json({ error: 'Failed to load chart data' });
+    }
+  });
+
   // Summary endpoint for cross-repo validation
   router.get('/charts/summary', (_req, res) => {
     res.json({ totalEndpoints: 10, description: "Cross-repo validation test" });
