@@ -17,3 +17,7 @@ export function logDebug(msg: string) {
 export function logWarn(msg: string) {
   console.warn(msg);
 }
+
+export function logTrace(msg: string) {
+  if (process.env.TRACE) console.trace(msg);
+}
