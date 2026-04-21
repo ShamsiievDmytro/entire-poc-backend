@@ -1,3 +1,5 @@
+export const SCENARIO_6_MARKER = 'orphan-test';
+
 import { Router } from 'express';
 import type Database from 'better-sqlite3';
 
