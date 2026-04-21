@@ -29,6 +29,7 @@ export function statusRoutes(db: Database.Database): Router {
       sessionCount,
       checkpointCount,
       linkCount,
+      gitAiTest: true,
     });
   });
 
