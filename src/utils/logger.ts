@@ -21,3 +21,7 @@ export function logWarn(msg: string) {
 export function logTrace(msg: string) {
   if (process.env.TRACE) console.trace(msg);
 }
+
+export function logFatal(msg: string) {
+  console.error('[FATAL]', msg);
+}
