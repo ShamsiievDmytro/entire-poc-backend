@@ -3,3 +3,7 @@ export function parseTimestamp(value: string | number | undefined | null): strin
   const d = new Date(value);
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
+
+export function formatDuration(ms: number): string {
+  return `${(ms / 1000).toFixed(1)}s`;
+}
