@@ -5,6 +5,7 @@ import { statusRoutes } from './routes/status.js';
 import { ingestRoutes } from './routes/ingest.js';
 import { chartRoutes } from './routes/charts.js';
 import { sessionRoutes } from './routes/sessions.js';
+import { gitaiRoutes } from './routes/gitai.js';
 import { errorHandler } from './middleware/error.js';
 
 export function createServer(db: Database.Database) {
@@ -22,6 +23,7 @@ export function createServer(db: Database.Database) {
   app.use('/api', ingestRoutes(db));
   app.use('/api', chartRoutes(db));
   app.use('/api', sessionRoutes(db));
+  app.use('/api', gitaiRoutes(db));
 
   app.use(errorHandler);
 

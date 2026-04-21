@@ -1,23 +1,41 @@
 import { Router } from 'express';
 import type Database from 'better-sqlite3';
 import { runIngestion, type IngestionReport } from '../../ingestion/orchestrator.js';
+import { runGitAiIngestion, type GitAiIngestionReport } from '../../ingestion/gitai-orchestrator.js';
 import { setLastIngestionRun } from './status.js';
 import { log } from '../../utils/logger.js';
 import { randomUUID } from 'node:crypto';
 
-let lastReport: IngestionReport = { sessions: 0, checkpoints: 0, links: 0, errors: [] };
+interface CombinedReport {
+  entire: IngestionReport;
+  gitai: GitAiIngestionReport;
+}
 
-export async function runIngestionCycle(db: Database.Database): Promise<IngestionReport> {
+let lastReport: CombinedReport = {
+  entire: { sessions: 0, checkpoints: 0, links: 0, errors: [] },
+  gitai: { commits: 0, repos: 0, errors: [] },
+};
+
+export async function runIngestionCycle(db: Database.Database): Promise<CombinedReport> {
   try {
     log('info', 'Ingestion cycle starting');
-    const report = await runIngestion(db);
+    const entireReport = await runIngestion(db);
+    const gitaiReport = await runGitAiIngestion(db);
     setLastIngestionRun(new Date().toISOString());
-    lastReport = report;
-    log('info', 'Ingestion cycle complete', { sessions: report.sessions, checkpoints: report.checkpoints, links: report.links });
-    return report;
+    lastReport = { entire: entireReport, gitai: gitaiReport };
+    log('info', 'Ingestion cycle complete', {
+      sessions: entireReport.sessions,
+      checkpoints: entireReport.checkpoints,
+      links: entireReport.links,
+      gitai_commits: gitaiReport.commits,
+    });
+    return lastReport;
   } catch (err) {
     log('error', 'Ingestion cycle failed', { error: String(err) });
-    lastReport = { sessions: 0, checkpoints: 0, links: 0, errors: [String(err)] };
+    lastReport = {
+      entire: { sessions: 0, checkpoints: 0, links: 0, errors: [String(err)] },
+      gitai: { commits: 0, repos: 0, errors: [String(err)] },
+    };
     return lastReport;
   }
 }

@@ -50,3 +50,18 @@ export interface SessionCommitLinkRow {
   confidence_score: number;
   created_at: string;
 }
+
+export interface GitAiCommitAttributionRow {
+  repo: string;
+  commit_sha: string;
+  agent: string;
+  model: string | null;
+  agent_lines: number;
+  human_lines: number;
+  agent_percentage: number;
+  prompt_id: string | null;
+  files_touched_json: string | null;
+  raw_note_json: string | null;
+  captured_at: string | null;
+  ingested_at: string;
+}

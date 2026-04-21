@@ -55,6 +55,24 @@ CREATE TABLE IF NOT EXISTS session_commit_links (
   UNIQUE (session_id, repo, checkpoint_id)
 );
 
+CREATE TABLE IF NOT EXISTS gitai_commit_attribution (
+  repo TEXT NOT NULL,
+  commit_sha TEXT NOT NULL,
+  agent TEXT NOT NULL,
+  model TEXT,
+  agent_lines INTEGER NOT NULL,
+  human_lines INTEGER NOT NULL,
+  agent_percentage REAL NOT NULL,
+  prompt_id TEXT,
+  files_touched_json TEXT,
+  raw_note_json TEXT,
+  captured_at TIMESTAMP,
+  ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (repo, commit_sha, agent)
+);
+
 CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON sessions(started_at);
 CREATE INDEX IF NOT EXISTS idx_repo_checkpoints_committed_at ON repo_checkpoints(committed_at);
 CREATE INDEX IF NOT EXISTS idx_session_repo_touches_repo ON session_repo_touches(repo);
+CREATE INDEX IF NOT EXISTS idx_gitai_committed_at ON gitai_commit_attribution(captured_at);
+CREATE INDEX IF NOT EXISTS idx_gitai_repo ON gitai_commit_attribution(repo);
