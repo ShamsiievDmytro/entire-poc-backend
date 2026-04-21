@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type Database from 'better-sqlite3';
 import { createGitAiRepo } from '../../db/gitai-repo.js';
+import { getPromptById, getFullTranscript } from '../../db/gitai-local-reader.js';
 
 export function gitaiRoutes(db: Database.Database): Router {
   const router = Router();
@@ -27,6 +28,60 @@ export function gitaiRoutes(db: Database.Database): Router {
         catch { return []; }
       }),
     });
+  });
+
+  // GET /api/gitai/commits/:sha/detail — full commit detail with local prompt data
+  router.get('/gitai/commits/:sha/detail', (req, res) => {
+    const rows = gitaiRepo.getBySha(req.params.sha);
+    if (rows.length === 0) {
+      res.status(404).json({ error: 'No Git AI attribution found for this commit' });
+      return;
+    }
+
+    const row = rows[0];
+    const files: unknown[] = [];
+    for (const r of rows) {
+      try { files.push(...JSON.parse(r.files_touched_json ?? '[]')); }
+      catch { /* skip malformed */ }
+    }
+
+    const localPrompt = row.prompt_id ? getPromptById(row.prompt_id) : null;
+
+    res.json({
+      commit_sha: row.commit_sha,
+      repo: row.repo,
+      captured_at: row.captured_at,
+      attribution: {
+        agent: row.agent,
+        model: row.model,
+        agent_lines: row.agent_lines,
+        human_lines: row.human_lines,
+        agent_percentage: row.agent_percentage,
+        prompt_id: row.prompt_id,
+      },
+      files,
+      raw_note: row.raw_note_json,
+      local_prompt: localPrompt,
+    });
+  });
+
+  // GET /api/gitai/commits/:sha/transcript — download full transcript
+  router.get('/gitai/commits/:sha/transcript', (req, res) => {
+    const promptId = req.query.prompt_id as string;
+    if (!promptId) {
+      res.status(400).json({ error: 'prompt_id query parameter required' });
+      return;
+    }
+
+    const transcript = getFullTranscript(promptId);
+    if (!transcript) {
+      res.status(404).json({ error: 'Transcript not found for this prompt' });
+      return;
+    }
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename=${promptId}.json`);
+    res.send(transcript);
   });
 
   // GET /api/gitai/summary — aggregated summary
