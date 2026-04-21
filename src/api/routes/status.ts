@@ -17,6 +17,7 @@ export function statusRoutes(db: Database.Database): Router {
     const repos = (db.prepare('SELECT DISTINCT repo FROM repo_checkpoints').all() as { repo: string }[]).map(r => r.repo);
 
     res.json({
+      version: '0.1.0',
       lastRun: lastIngestionRun,
       repos,
       sessionCount,
