@@ -47,6 +47,25 @@ export function parseJsonl(jsonlText: string, opts: JsonlParseOptions): ParsedSe
   const slashCommandsByRepo = new Map<string, Set<string>>();
   const subagentCountByRepo = new Map<string, number>();
 
+  // Helper: record a file touch
+  function recordFileTouch(absPath: string) {
+    const repo = resolveRepoFromAbsolutePath(absPath, opts.knownRepos);
+    if (repo) {
+      if (!filesTouchedByRepo.has(repo)) filesTouchedByRepo.set(repo, new Set());
+      const relPath = relativePathFromRepo(absPath, repo);
+      if (relPath) filesTouchedByRepo.get(repo)!.add(relPath);
+    }
+  }
+
+  // Helper: record a tool call
+  function recordToolCall(toolName: string, absPath: string | null) {
+    const repo = absPath ? resolveRepoFromAbsolutePath(absPath, opts.knownRepos) : null;
+    const targetRepo = repo || '_workspace';
+    if (!toolCallsByRepo.has(targetRepo)) toolCallsByRepo.set(targetRepo, new Map());
+    const m = toolCallsByRepo.get(targetRepo)!;
+    m.set(toolName, (m.get(toolName) || 0) + 1);
+  }
+
   for (const event of events) {
     const ts = parseTimestamp(event.timestamp as string | number);
     if (ts) {
@@ -71,35 +90,52 @@ export function parseJsonl(jsonlText: string, opts: JsonlParseOptions): ParsedSe
       totalCacheReadTokens += usage.cache_read_tokens || usage.cacheReadTokens || 0;
     }
 
-    // File path events
-    const filePath = (event.filePath || event.file_path || event.path) as string | undefined;
-    if (filePath) {
-      const repo = resolveRepoFromAbsolutePath(filePath, opts.knownRepos);
-      if (repo) {
-        if (!filesTouchedByRepo.has(repo)) filesTouchedByRepo.set(repo, new Set());
-        const relPath = relativePathFromRepo(filePath, repo);
-        if (relPath) filesTouchedByRepo.get(repo)!.add(relPath);
+    // --- Extract file paths and tool names from all known locations ---
+
+    // 1. Top-level filePath (simple event format)
+    const topFilePath = (event.filePath || event.file_path || event.path) as string | undefined;
+    if (topFilePath) recordFileTouch(topFilePath);
+
+    // 2. toolUseResult (user-type events with tool results)
+    const toolResult = event.toolUseResult as Record<string, unknown> | undefined;
+    if (toolResult) {
+      const trFile = toolResult.file as Record<string, unknown> | undefined;
+      const trPath = (
+        toolResult.filePath || toolResult.file_path ||
+        trFile?.filePath || trFile?.file_path
+      ) as string | undefined;
+      if (trPath) recordFileTouch(trPath);
+    }
+
+    // 3. Assistant tool_use events: message.content[].type=tool_use
+    //    These contain tool name + input.file_path
+    const message = event.message as { content?: unknown[] } | undefined;
+    if (Array.isArray(message?.content)) {
+      for (const block of message!.content) {
+        const b = block as Record<string, unknown>;
+        if (b.type === 'tool_use' && b.name) {
+          const input = b.input as Record<string, unknown> | undefined;
+          const inputPath = (input?.file_path || input?.filePath) as string | undefined;
+          if (inputPath) recordFileTouch(inputPath);
+          recordToolCall(b.name as string, inputPath || null);
+        }
       }
     }
 
-    // Tool calls
-    const toolName = (event.tool || event.tool_name || event.toolName) as string | undefined;
-    if (toolName && filePath) {
-      const repo = resolveRepoFromAbsolutePath(filePath, opts.knownRepos);
-      const targetRepo = repo || '_workspace';
-      if (!toolCallsByRepo.has(targetRepo)) toolCallsByRepo.set(targetRepo, new Map());
-      const m = toolCallsByRepo.get(targetRepo)!;
-      m.set(toolName, (m.get(toolName) || 0) + 1);
-    } else if (toolName) {
-      if (!toolCallsByRepo.has('_workspace')) toolCallsByRepo.set('_workspace', new Map());
-      const m = toolCallsByRepo.get('_workspace')!;
-      m.set(toolName, (m.get(toolName) || 0) + 1);
+    // 4. Top-level tool name (simple event format)
+    const topToolName = (event.tool || event.tool_name || event.toolName) as string | undefined;
+    if (topToolName) {
+      const anyPath = topFilePath ||
+        (toolResult?.filePath || toolResult?.file_path ||
+         (toolResult?.file as Record<string, unknown> | undefined)?.filePath) as string | undefined;
+      recordToolCall(topToolName, (anyPath as string) || null);
     }
 
     // Slash commands
     const slashCmd = (event.slash_command || event.slashCommand) as string | undefined;
     if (slashCmd) {
-      const repo = filePath ? resolveRepoFromAbsolutePath(filePath, opts.knownRepos) : null;
+      const anyPath = topFilePath;
+      const repo = anyPath ? resolveRepoFromAbsolutePath(anyPath, opts.knownRepos) : null;
       const targetRepo = repo || '_workspace';
       if (!slashCommandsByRepo.has(targetRepo)) slashCommandsByRepo.set(targetRepo, new Set());
       slashCommandsByRepo.get(targetRepo)!.add(slashCmd);
@@ -108,7 +144,8 @@ export function parseJsonl(jsonlText: string, opts: JsonlParseOptions): ParsedSe
     // Subagent spawns
     const eventType = (event.type || event.event_type) as string | undefined;
     if (eventType === 'task_spawn' || eventType === 'subagent') {
-      const repo = filePath ? resolveRepoFromAbsolutePath(filePath, opts.knownRepos) : null;
+      const anyPath = topFilePath;
+      const repo = anyPath ? resolveRepoFromAbsolutePath(anyPath, opts.knownRepos) : null;
       const targetRepo = repo || '_workspace';
       subagentCountByRepo.set(targetRepo, (subagentCountByRepo.get(targetRepo) || 0) + 1);
     }
