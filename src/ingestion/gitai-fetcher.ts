@@ -1,101 +1,103 @@
-import { getOctokit } from './github-client.js';
+import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { config } from '../config.js';
 import { log } from '../utils/logger.js';
 
 export interface RawGitAiNote {
   commitSha: string;
   noteContent: string;
   committedAt: string | null;
+  diffAdditions: number;
+  diffDeletions: number;
+}
+
+function git(repoPath: string, args: string[]): string {
+  return execFileSync('git', ['-C', repoPath, ...args], {
+    encoding: 'utf-8',
+    timeout: 30_000,
+  }).trim();
 }
 
 /**
- * Fetch all Git AI notes (refs/notes/ai) from a GitHub repo.
- *
- * Strategy: use the Git database API to walk the notes tree.
- * Each entry in the notes tree is named after the commit SHA it annotates,
- * and the blob content is the note itself.
+ * Fetch all Git AI notes from a local repo using git CLI.
+ * No GitHub API calls — reads directly from the local .git directory.
  */
 export async function fetchGitAiNotes(
-  owner: string,
+  _owner: string,
   repo: string,
 ): Promise<RawGitAiNote[]> {
-  const octokit = getOctokit();
-  const notes: RawGitAiNote[] = [];
+  const repoPath = join(config.REPOS_BASE_PATH, repo);
 
-  // Step 1: Get the notes/ai ref
-  let noteRefSha: string;
-  try {
-    const ref = await octokit.rest.git.getRef({
-      owner,
-      repo,
-      ref: 'notes/ai',
-    });
-    noteRefSha = ref.data.object.sha;
-  } catch (err) {
-    const status = (err as { status?: number }).status;
-    if (status === 404) {
-      log('info', `No notes/ai ref in ${owner}/${repo} — no Git AI data yet`);
-      return [];
-    }
-    throw err;
-  }
-
-  // Step 2: Get the commit that the ref points to, then the tree
-  let treeSha: string;
-  try {
-    const commit = await octokit.rest.git.getCommit({ owner, repo, commit_sha: noteRefSha });
-    treeSha = commit.data.tree.sha;
-  } catch {
-    // The ref might point directly to a tree (not a commit)
-    treeSha = noteRefSha;
-  }
-
-  // Step 3: Walk the tree. Git notes uses a fan-out structure:
-  // Either flat (full SHA as filename) or 2-char prefix dirs.
-  let tree: { path?: string; sha?: string; type?: string }[];
-  try {
-    const treeRes = await octokit.rest.git.getTree({
-      owner,
-      repo,
-      tree_sha: treeSha,
-      recursive: 'true',
-    });
-    tree = treeRes.data.tree;
-  } catch (err) {
-    log('error', `Failed to get notes tree for ${owner}/${repo}`, { error: String(err) });
+  if (!existsSync(join(repoPath, '.git'))) {
+    log('warn', `Repo not found locally: ${repoPath}`);
     return [];
   }
 
-  // Step 4: Each blob is a note. The path reconstructs the commit SHA.
-  // Fan-out format: "ab/cdef1234..." → commit SHA "abcdef1234..."
-  const blobEntries = tree.filter((e) => e.type === 'blob' && e.path && e.sha);
+  const notes: RawGitAiNote[] = [];
 
-  for (const entry of blobEntries) {
-    const commitSha = entry.path!.replace(/\//g, '');
-    if (commitSha.length < 7) continue; // skip non-SHA entries
+  // Step 1: List all notes — each line is "<note_blob_sha> <commit_sha>"
+  let noteList: string;
+  try {
+    noteList = git(repoPath, ['notes', '--ref=ai', 'list']);
+  } catch {
+    log('info', `No notes/ai ref in ${repo} — no Git AI data yet`);
+    return [];
+  }
+
+  if (!noteList) return [];
+
+  const lines = noteList.split('\n').filter(Boolean);
+
+  // Step 2: For each noted commit, get the note content and commit metadata
+  for (const line of lines) {
+    const parts = line.split(/\s+/);
+    if (parts.length < 2) continue;
+    const commitSha = parts[1];
 
     try {
-      const blob = await octokit.rest.git.getBlob({
-        owner,
-        repo,
-        file_sha: entry.sha!,
-      });
-      const noteContent = Buffer.from(blob.data.content, 'base64').toString('utf-8');
+      // Get note content
+      const noteContent = git(repoPath, ['notes', '--ref=ai', 'show', commitSha]);
 
-      // Fetch commit date
+      // Get commit date
       let committedAt: string | null = null;
       try {
-        const commitRes = await octokit.rest.repos.getCommit({ owner, repo, ref: commitSha });
-        committedAt = commitRes.data.commit.committer?.date ?? commitRes.data.commit.author?.date ?? null;
+        committedAt = git(repoPath, ['log', '-1', '--format=%aI', commitSha]);
       } catch {
-        log('warn', `Could not fetch commit date for ${repo}@${commitSha}`);
+        log('warn', `Could not get commit date for ${repo}@${commitSha}`);
       }
 
-      notes.push({ commitSha, noteContent, committedAt });
+      // Get diff stats (additions/deletions) for accurate human line calculation
+      let diffAdditions = 0;
+      let diffDeletions = 0;
+      try {
+        const numstat = git(repoPath, ['diff', '--numstat', `${commitSha}^..${commitSha}`]);
+        for (const statLine of numstat.split('\n').filter(Boolean)) {
+          const [add, del] = statLine.split('\t');
+          if (add !== '-') diffAdditions += parseInt(add, 10) || 0;
+          if (del !== '-') diffDeletions += parseInt(del, 10) || 0;
+        }
+      } catch {
+        // Root commit has no parent — diff against empty tree
+        try {
+          const emptyTree = '4b825dc642cb6eb9a060e54bf899d69f82cf2c0';
+          const numstat = git(repoPath, ['diff', '--numstat', `${emptyTree}..${commitSha}`]);
+          for (const statLine of numstat.split('\n').filter(Boolean)) {
+            const [add, del] = statLine.split('\t');
+            if (add !== '-') diffAdditions += parseInt(add, 10) || 0;
+            if (del !== '-') diffDeletions += parseInt(del, 10) || 0;
+          }
+        } catch {
+          // skip
+        }
+      }
+
+      notes.push({ commitSha, noteContent, committedAt, diffAdditions, diffDeletions });
     } catch (err) {
-      log('warn', `Failed to fetch note blob for ${repo}@${commitSha}`, { error: String(err) });
+      log('warn', `Failed to read note for ${repo}@${commitSha}`, { error: String(err) });
     }
   }
 
-  log('info', `Fetched ${notes.length} Git AI notes from ${owner}/${repo}`);
+  log('info', `Fetched ${notes.length} Git AI notes from local ${repo}`);
   return notes;
 }

@@ -31,13 +31,16 @@ export async function runGitAiIngestion(db: Database.Database): Promise<GitAiIng
         const attribution = computeAttribution(parsed);
 
         // One row per prompt (agent) in the note
+        // Use git diff additions as ground truth for total lines added
+        const diffAdded = note.diffAdditions;
+
         for (const prompt of parsed.prompts) {
           const promptFiles = attribution.filesTouched.filter(
             (f) => f.promptId === prompt.promptId,
           );
           const promptAgentLines = promptFiles.reduce((sum, f) => sum + f.lineCount, 0);
-          const totalLines = prompt.totalAdditions;
-          const promptHumanLines = Math.max(0, totalLines - prompt.acceptedLines);
+          // Human lines = actual diff additions minus agent-claimed lines
+          const promptHumanLines = Math.max(0, diffAdded - promptAgentLines);
           const pctTotal = promptAgentLines + promptHumanLines;
           const pct = pctTotal > 0 ? Math.round((promptAgentLines / pctTotal) * 1000) / 10 : 0;
 

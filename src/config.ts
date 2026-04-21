@@ -14,6 +14,7 @@ const Schema = z.object({
   DB_PATH: z.string().default('./data/poc.db'),
   INGESTION_INTERVAL_MS: z.coerce.number().default(5 * 60 * 1000),
   GITAI_LOCAL_DB_PATH: z.string().default(join(homedir(), '.git-ai', 'internal', 'db')),
+  REPOS_BASE_PATH: z.string().default(join(homedir(), 'Projects', 'metrics_2_0')),
 });
 
 const parsed = Schema.parse(process.env);
