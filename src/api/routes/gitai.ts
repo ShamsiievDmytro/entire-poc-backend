@@ -159,20 +159,19 @@ export function gitaiRoutes(db: Database.Database): Router {
         const raw = r.raw_note_json ?? '';
         const parts = raw.split('\n---\n');
         // find the JSON part (last non-empty chunk, or the only one)
-        let parsed: { prompts?: Array<{ overriden_lines?: number }> } | null = null;
+        let parsed: { prompts?: Record<string, { overriden_lines?: number }> } | null = null;
         for (let i = parts.length - 1; i >= 0; i--) {
           const part = parts[i].trim();
           if (part.startsWith('{')) {
-            parsed = JSON.parse(part) as { prompts?: Array<{ overriden_lines?: number }> };
+            parsed = JSON.parse(part) as { prompts?: Record<string, { overriden_lines?: number }> };
             break;
           }
         }
         if (parsed === null) {
-          // no JSON found — count as first-time-right
           ftrPassed++;
         } else {
-          const prompts = parsed.prompts ?? [];
-          const allZero = prompts.every((p) => (p.overriden_lines ?? 0) === 0);
+          const promptValues = Object.values(parsed.prompts ?? {});
+          const allZero = promptValues.every((p) => (p.overriden_lines ?? 0) === 0);
           if (allZero) ftrPassed++;
         }
       } catch {
@@ -222,20 +221,19 @@ export function gitaiRoutes(db: Database.Database): Router {
       try {
         const raw = r.raw_note_json ?? '';
         const parts = raw.split('\n---\n');
-        let parsed: { prompts?: Array<{ human_author?: string }> } | null = null;
+        let parsed: { prompts?: Record<string, { human_author?: string }> } | null = null;
         for (let i = parts.length - 1; i >= 0; i--) {
           const part = parts[i].trim();
           if (part.startsWith('{')) {
-            parsed = JSON.parse(part) as { prompts?: Array<{ human_author?: string }> };
+            parsed = JSON.parse(part) as { prompts?: Record<string, { human_author?: string }> };
             break;
           }
         }
         if (parsed?.prompts) {
-          for (const p of parsed.prompts) {
-            const author = p.human_author ?? 'unknown';
-            const existing = devMap.get(author) ?? { sum: 0, count: 0 };
-            devMap.set(author, { sum: existing.sum + r.agent_percentage, count: existing.count + 1 });
-          }
+          const firstPrompt = Object.values(parsed.prompts)[0];
+          const author = firstPrompt?.human_author ?? 'unknown';
+          const existing = devMap.get(author) ?? { sum: 0, count: 0 };
+          devMap.set(author, { sum: existing.sum + r.agent_percentage, count: existing.count + 1 });
         }
       } catch {
         // skip unparseable
@@ -243,8 +241,8 @@ export function gitaiRoutes(db: Database.Database): Router {
     }
     const by_developer = Array.from(devMap.entries()).map(([author, { sum, count }]) => ({
       author,
-      avg_agent_pct: sum / count,
-      commit_count: count,
+      commits: count,
+      avg_agent_pct: Math.round(sum / count * 10) / 10,
     }));
 
     // --- by_model ---
@@ -253,37 +251,38 @@ export function gitaiRoutes(db: Database.Database): Router {
       const model = r.model ?? 'unknown';
       modelMap.set(model, (modelMap.get(model) ?? 0) + 1);
     }
-    const by_model = Array.from(modelMap.entries()).map(([model, commit_count]) => ({
+    const by_model = Array.from(modelMap.entries()).map(([model, commits]) => ({
       model,
-      commit_count,
+      commits,
     }));
 
     // --- files_by_layer ---
-    const layerMap = new Map<string, number>();
+    const layerMap = new Map<string, { ai_lines: number; human_lines: number }>();
     for (const r of rows) {
       try {
         const files = JSON.parse(r.files_touched_json ?? '[]') as Array<{
-          filePath?: string;
+          file?: string;
           lineCount?: number;
         }>;
         for (const f of files) {
-          const layer = classifyFileLayer(f.filePath ?? '');
-          layerMap.set(layer, (layerMap.get(layer) ?? 0) + (f.lineCount ?? 0));
+          const layer = classifyFileLayer(f.file ?? '');
+          const entry = layerMap.get(layer) ?? { ai_lines: 0, human_lines: 0 };
+          entry.ai_lines += f.lineCount ?? 0;
+          layerMap.set(layer, entry);
         }
       } catch {
         // skip malformed
       }
     }
-    const files_by_layer = Array.from(layerMap.entries()).map(([layer, total_lines]) => ({
-      layer,
-      total_lines,
-    }));
+    const files_by_layer = Array.from(layerMap.entries())
+      .map(([layer, d]) => ({ layer, ai_lines: d.ai_lines, human_lines: d.human_lines }))
+      .sort((a, b) => b.ai_lines - a.ai_lines);
 
     // --- human_edit_rate ---
     const human_edit_rate = sortedAsc.map((r) => ({
       commit_sha: r.commit_sha,
       repo: r.repo,
-      human_edit_rate: 100 - r.agent_percentage,
+      human_pct: Math.round((100 - r.agent_percentage) * 10) / 10,
       captured_at: r.captured_at,
     }));
 
