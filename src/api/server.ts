@@ -19,6 +19,16 @@ export function createServer(db: Database.Database) {
     res.json({ ok: true, uptime: process.uptime() });
   });
 
+  // Detailed health check endpoint
+  app.get('/api/health/detail', (_req, res) => {
+    res.json({
+      ok: true,
+      uptime: process.uptime(),
+      nodeVersion: process.version,
+      memoryMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+    });
+  });
+
   app.use('/api', statusRoutes(db));
   app.use('/api', ingestRoutes(db));
   app.use('/api', chartRoutes(db));
