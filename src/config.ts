@@ -1,6 +1,8 @@
 // Re-validated: Pattern A* (workspace-only) on 2026-04-21
 // Validated: Pattern C cross-repo config
 import 'dotenv/config';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { z } from 'zod';
 
 const Schema = z.object({
@@ -11,6 +13,7 @@ const Schema = z.object({
   PORT: z.coerce.number().default(3001),
   DB_PATH: z.string().default('./data/poc.db'),
   INGESTION_INTERVAL_MS: z.coerce.number().default(5 * 60 * 1000),
+  GITAI_LOCAL_DB_PATH: z.string().default(join(homedir(), '.git-ai', 'internal', 'db')),
 });
 
 const parsed = Schema.parse(process.env);
