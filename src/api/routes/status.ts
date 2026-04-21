@@ -18,6 +18,7 @@ export function statusRoutes(db: Database.Database): Router {
 
     res.json({
       version: '0.1.0',
+      patternVersion: 'A-star-v1',
       lastRun: lastIngestionRun,
       repos,
       sessionCount,
