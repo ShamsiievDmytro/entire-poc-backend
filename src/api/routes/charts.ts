@@ -95,5 +95,10 @@ export function chartRoutes(db: Database.Database): Router {
     res.json(result);
   });
 
+  // Summary endpoint for cross-repo validation
+  router.get('/charts/summary', (_req, res) => {
+    res.json({ totalEndpoints: 10, description: "Cross-repo validation test" });
+  });
+
   return router;
 }
