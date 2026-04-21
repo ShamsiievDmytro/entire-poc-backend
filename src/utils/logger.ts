@@ -13,3 +13,7 @@ export function logDebug(msg: string) {
     console.debug(msg);
   }
 }
+
+export function logWarn(msg: string) {
+  console.warn(msg);
+}
