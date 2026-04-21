@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { computeLinks } from '../src/domain/session-joiner.js';
+import { computeLinks, computeTranscriptLinks } from '../src/domain/session-joiner.js';
 import type { SessionRow, RepoCheckpointRow } from '../src/db/types.js';
+import type { RepoCommit } from '../src/ingestion/github-client.js';
 
 function makeSession(overrides: Partial<SessionRow> = {}): SessionRow {
   return {
@@ -40,7 +41,17 @@ function makeCheckpoint(overrides: Partial<RepoCheckpointRow> = {}): RepoCheckpo
   };
 }
 
-describe('computeLinks', () => {
+function makeCommit(overrides: Partial<RepoCommit> = {}): RepoCommit {
+  return {
+    sha: 'abc123def',
+    message: 'test commit',
+    committedAt: '2026-04-21T10:15:00.000Z',
+    files: ['src/api/server.ts'],
+    ...overrides,
+  };
+}
+
+describe('computeLinks (checkpoint-based)', () => {
   it('produces HIGH confidence on session ID match', () => {
     const session = makeSession();
     const ckpt = makeCheckpoint({ session_id_in_metadata: 'sess-1' });
@@ -68,7 +79,6 @@ describe('computeLinks', () => {
 
   it('produces LOW on ±15 min only', () => {
     const session = makeSession();
-    // Commit 10 min after session end — within 15 but outside 5
     const ckpt = makeCheckpoint({
       committed_at: '2026-04-21T10:40:00.000Z',
       files_touched_json: JSON.stringify(['unrelated-file.ts']),
@@ -120,5 +130,110 @@ describe('computeLinks', () => {
     expect(links).toHaveLength(2);
     expect(links[0].confidence).toBe('HIGH');
     expect(links[1].confidence).toBe('MEDIUM');
+  });
+});
+
+describe('computeTranscriptLinks (transcript-first)', () => {
+  it('produces MEDIUM on ±5 min + file overlap', () => {
+    const session = makeSession();
+    const commit = makeCommit({
+      committedAt: '2026-04-21T10:15:00.000Z',
+      files: ['src/api/routes/status.ts'],
+    });
+    const sessionFiles = new Set(['src/api/routes/status.ts']);
+
+    const links = computeTranscriptLinks(session, sessionFiles, 'entire-poc-backend', [commit]);
+
+    expect(links).toHaveLength(1);
+    expect(links[0].confidence).toBe('MEDIUM');
+    expect(links[0].joinReason).toBe('timestamp_files_overlap');
+    expect(links[0].confidenceScore).toBe(0.7);
+    expect(links[0].repo).toBe('entire-poc-backend');
+    expect(links[0].checkpointId).toBe(commit.sha);
+  });
+
+  it('produces LOW when within ±15 min but no file overlap', () => {
+    const session = makeSession();
+    const commit = makeCommit({
+      committedAt: '2026-04-21T10:40:00.000Z',
+      files: ['unrelated.ts'],
+    });
+    const sessionFiles = new Set(['src/api/routes/status.ts']);
+
+    const links = computeTranscriptLinks(session, sessionFiles, 'entire-poc-backend', [commit]);
+
+    expect(links).toHaveLength(1);
+    expect(links[0].confidence).toBe('LOW');
+    expect(links[0].joinReason).toBe('fallback');
+    expect(links[0].confidenceScore).toBe(0.3);
+  });
+
+  it('produces no link outside ±15 min window', () => {
+    const session = makeSession();
+    const commit = makeCommit({
+      committedAt: '2026-04-21T12:00:00.000Z',
+      files: ['src/api/routes/status.ts'],
+    });
+    const sessionFiles = new Set(['src/api/routes/status.ts']);
+
+    const links = computeTranscriptLinks(session, sessionFiles, 'entire-poc-backend', [commit]);
+
+    expect(links).toHaveLength(0);
+  });
+
+  it('handles multiple commits with mixed confidence', () => {
+    const session = makeSession();
+    const commits = [
+      makeCommit({
+        sha: 'sha-1',
+        committedAt: '2026-04-21T10:15:00.000Z',
+        files: ['src/api/routes/status.ts'],
+      }),
+      makeCommit({
+        sha: 'sha-2',
+        committedAt: '2026-04-21T10:40:00.000Z',
+        files: ['unrelated.ts'],
+      }),
+    ];
+    const sessionFiles = new Set(['src/api/routes/status.ts']);
+
+    const links = computeTranscriptLinks(session, sessionFiles, 'entire-poc-backend', commits);
+
+    expect(links).toHaveLength(2);
+    expect(links[0].confidence).toBe('MEDIUM');
+    expect(links[0].checkpointId).toBe('sha-1');
+    expect(links[1].confidence).toBe('LOW');
+    expect(links[1].checkpointId).toBe('sha-2');
+  });
+
+  it('returns empty for session without started_at', () => {
+    const session = makeSession({ started_at: '' });
+    const commit = makeCommit();
+    const links = computeTranscriptLinks(session, new Set(['src/api/server.ts']), 'repo', [commit]);
+
+    expect(links).toHaveLength(0);
+  });
+
+  it('uses started_at as end when ended_at is null', () => {
+    // Session with no end time — window is just the start point ±5min
+    const session = makeSession({
+      started_at: '2026-04-21T10:00:00.000Z',
+      ended_at: null,
+    });
+    // Commit at +3 min, within ±5 min of the point session
+    const commit = makeCommit({
+      committedAt: '2026-04-21T10:03:00.000Z',
+      files: ['src/api/routes/status.ts'],
+    });
+
+    const links = computeTranscriptLinks(
+      session,
+      new Set(['src/api/routes/status.ts']),
+      'entire-poc-backend',
+      [commit],
+    );
+
+    expect(links).toHaveLength(1);
+    expect(links[0].confidence).toBe('MEDIUM');
   });
 });
