@@ -7,3 +7,9 @@ export function log(level: 'info' | 'warn' | 'error', message: string, data?: Re
   };
   console.log(JSON.stringify(entry));
 }
+
+export function logDebug(msg: string) {
+  if (process.env.DEBUG) {
+    console.debug(msg);
+  }
+}
