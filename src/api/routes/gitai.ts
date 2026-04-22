@@ -4,17 +4,6 @@ import { createGitAiRepo } from '../../db/gitai-repo.js';
 import { getPromptById, getFullTranscript } from '../../db/gitai-local-reader.js';
 import { log } from '../../utils/logger.js';
 
-export function classifyFileLayer(filePath: string): string {
-  if (/components\/|pages\//.test(filePath)) return 'components';
-  if (/routes\/|api\//.test(filePath)) return 'routes';
-  if (/utils\/|lib\/|domain\//.test(filePath)) return 'utils';
-  if (/tests\/|test\/|\.test\.|\.spec\./.test(filePath)) return 'tests';
-  if (/docs\/|\.md$/.test(filePath)) return 'docs';
-  if (/db\/|migrations\//.test(filePath)) return 'database';
-  if (/ingestion\//.test(filePath)) return 'ingestion';
-  return 'other';
-}
-
 export function gitaiRoutes(db: Database.Database): Router {
   const router = Router();
   const gitaiRepo = createGitAiRepo(db);
@@ -187,6 +176,7 @@ export function gitaiRoutes(db: Database.Database): Router {
     const total_human_lines = rows.reduce((sum, r) => sum + r.human_lines, 0);
     const total_overridden_lines = rows.reduce((sum, r) => sum + r.overridden_lines, 0);
 
+    const totalAllLines = total_ai_lines + total_human_lines + total_overridden_lines;
     const summary = {
       total_commits,
       avg_agent_pct,
@@ -195,6 +185,9 @@ export function gitaiRoutes(db: Database.Database): Router {
       total_ai_lines,
       total_human_lines,
       total_overridden_lines,
+      ai_pct: totalAllLines > 0 ? Math.round(total_ai_lines / totalAllLines * 1000) / 10 : 0,
+      human_pct: totalAllLines > 0 ? Math.round(total_human_lines / totalAllLines * 1000) / 10 : 0,
+      overridden_pct: totalAllLines > 0 ? Math.round(total_overridden_lines / totalAllLines * 1000) / 10 : 0,
     };
 
     // --- agent_pct_over_time (sorted ASC) ---
@@ -209,27 +202,46 @@ export function gitaiRoutes(db: Database.Database): Router {
       captured_at: r.captured_at,
     }));
 
-    // --- attribution_breakdown (sorted ASC) ---
-    const attribution_breakdown = sortedAsc.map((r) => ({
-      commit_sha: r.commit_sha,
-      repo: r.repo,
-      agent_lines: r.agent_lines,
-      human_lines: r.human_lines,
-      captured_at: r.captured_at,
-    }));
+    // --- attribution_breakdown (sorted ASC, percentages) ---
+    const attribution_breakdown = sortedAsc.map((r) => {
+      const total = r.agent_lines + r.human_lines + r.overridden_lines;
+      return {
+        commit_sha: r.commit_sha,
+        repo: r.repo,
+        ai_pct: total > 0 ? Math.round(r.agent_lines / total * 1000) / 10 : 0,
+        human_pct: total > 0 ? Math.round(r.human_lines / total * 1000) / 10 : 0,
+        overridden_pct: total > 0 ? Math.round(r.overridden_lines / total * 1000) / 10 : 0,
+        agent_lines: r.agent_lines,
+        human_lines: r.human_lines,
+        overridden_lines: r.overridden_lines,
+        captured_at: r.captured_at,
+      };
+    });
 
     // --- by_developer ---
-    const devMap = new Map<string, { sum: number; count: number }>();
+    const devMap = new Map<string, { commits: number; ai: number; human: number; overridden: number }>();
     for (const r of rows) {
       const author = r.commit_author ?? 'unknown';
-      const existing = devMap.get(author) ?? { sum: 0, count: 0 };
-      devMap.set(author, { sum: existing.sum + r.agent_percentage, count: existing.count + 1 });
+      const entry = devMap.get(author) ?? { commits: 0, ai: 0, human: 0, overridden: 0 };
+      entry.commits++;
+      entry.ai += r.agent_lines;
+      entry.human += r.human_lines;
+      entry.overridden += r.overridden_lines;
+      devMap.set(author, entry);
     }
-    const by_developer = Array.from(devMap.entries()).map(([author, { sum, count }]) => ({
-      author,
-      commits: count,
-      avg_agent_pct: Math.round(sum / count * 10) / 10,
-    }));
+    const by_developer = Array.from(devMap.entries()).map(([author, d]) => {
+      const total = d.ai + d.human + d.overridden;
+      return {
+        author,
+        commits: d.commits,
+        ai_lines: d.ai,
+        human_lines: d.human,
+        overridden_lines: d.overridden,
+        ai_pct: total > 0 ? Math.round(d.ai / total * 1000) / 10 : 0,
+        human_pct: total > 0 ? Math.round(d.human / total * 1000) / 10 : 0,
+        overridden_pct: total > 0 ? Math.round(d.overridden / total * 1000) / 10 : 0,
+      };
+    });
 
     // --- by_model ---
     const modelMap = new Map<string, number>();
@@ -241,28 +253,6 @@ export function gitaiRoutes(db: Database.Database): Router {
       model,
       commits,
     }));
-
-    // --- files_by_layer ---
-    const layerMap = new Map<string, { ai_lines: number; human_lines: number }>();
-    for (const r of rows) {
-      try {
-        const files = JSON.parse(r.files_touched_json ?? '[]') as Array<{
-          file?: string;
-          lineCount?: number;
-        }>;
-        for (const f of files) {
-          const layer = classifyFileLayer(f.file ?? '');
-          const entry = layerMap.get(layer) ?? { ai_lines: 0, human_lines: 0 };
-          entry.ai_lines += f.lineCount ?? 0;
-          layerMap.set(layer, entry);
-        }
-      } catch {
-        // skip malformed
-      }
-    }
-    const files_by_layer = Array.from(layerMap.entries())
-      .map(([layer, d]) => ({ layer, ai_lines: d.ai_lines, human_lines: d.human_lines }))
-      .sort((a, b) => b.ai_lines - a.ai_lines);
 
     // --- ai_human_rate_by_day ---
     const dayMap = new Map<string, { ai_lines: number; human_lines: number; overridden_lines: number }>();
@@ -289,21 +279,6 @@ export function gitaiRoutes(db: Database.Database): Router {
         };
       });
 
-    // --- commit_cadence ---
-    const commit_cadence: Array<{ commit_sha: string; hours_since_prev: number; captured_at: string | null }> = [];
-    for (let i = 1; i < sortedAsc.length; i++) {
-      const prev = sortedAsc[i - 1];
-      const curr = sortedAsc[i];
-      const prevMs = prev.captured_at ? new Date(prev.captured_at).getTime() : NaN;
-      const currMs = curr.captured_at ? new Date(curr.captured_at).getTime() : NaN;
-      const hours_since_prev = isNaN(prevMs) || isNaN(currMs) ? 0 : (currMs - prevMs) / 3_600_000;
-      commit_cadence.push({
-        commit_sha: curr.commit_sha,
-        hours_since_prev,
-        captured_at: curr.captured_at,
-      });
-    }
-
     res.json({
       summary,
       agent_pct_over_time,
@@ -311,7 +286,6 @@ export function gitaiRoutes(db: Database.Database): Router {
       by_developer,
       by_model,
       ai_human_rate_by_day,
-      commit_cadence,
     });
   });
 
