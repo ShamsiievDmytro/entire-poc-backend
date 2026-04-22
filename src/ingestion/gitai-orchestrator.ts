@@ -53,9 +53,10 @@ export async function runGitAiIngestion(db: Database.Database): Promise<GitAiIng
             (f) => f.promptId === prompt.promptId,
           );
           const promptAgentLines = promptFiles.reduce((sum, f) => sum + f.lineCount, 0);
-          // Human lines = actual diff additions minus agent-claimed lines
-          const promptHumanLines = Math.max(0, diffAdded - promptAgentLines);
-          const pctTotal = promptAgentLines + promptHumanLines;
+          const overriddenLines = prompt.overriddenLines;
+          // Human lines = diff additions minus agent lines minus overridden lines
+          const promptHumanLines = Math.max(0, diffAdded - promptAgentLines - overriddenLines);
+          const pctTotal = promptAgentLines + promptHumanLines + overriddenLines;
           const pct = pctTotal > 0 ? Math.round((promptAgentLines / pctTotal) * 1000) / 10 : 0;
 
           gitaiRepo.upsert({
@@ -65,6 +66,7 @@ export async function runGitAiIngestion(db: Database.Database): Promise<GitAiIng
             model: prompt.model,
             agent_lines: promptAgentLines,
             human_lines: promptHumanLines,
+            overridden_lines: overriddenLines,
             agent_percentage: pct,
             prompt_id: prompt.promptId,
             commit_author: note.commitAuthor,

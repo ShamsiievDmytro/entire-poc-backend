@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS gitai_commit_attribution (
   model TEXT,
   agent_lines INTEGER NOT NULL,
   human_lines INTEGER NOT NULL,
+  overridden_lines INTEGER NOT NULL DEFAULT 0,
   agent_percentage REAL NOT NULL,
   prompt_id TEXT,
   commit_author TEXT,

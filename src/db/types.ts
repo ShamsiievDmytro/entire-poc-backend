@@ -58,6 +58,7 @@ export interface GitAiCommitAttributionRow {
   model: string | null;
   agent_lines: number;
   human_lines: number;
+  overridden_lines: number;
   agent_percentage: number;
   prompt_id: string | null;
   commit_author: string | null;

@@ -68,6 +68,7 @@ export function gitaiRoutes(db: Database.Database): Router {
         model: row.model,
         agent_lines: row.agent_lines,
         human_lines: row.human_lines,
+        overridden_lines: row.overridden_lines,
         agent_percentage: row.agent_percentage,
         prompt_id: row.prompt_id,
       },
@@ -184,6 +185,7 @@ export function gitaiRoutes(db: Database.Database): Router {
 
     const total_ai_lines = rows.reduce((sum, r) => sum + r.agent_lines, 0);
     const total_human_lines = rows.reduce((sum, r) => sum + r.human_lines, 0);
+    const total_overridden_lines = rows.reduce((sum, r) => sum + r.overridden_lines, 0);
 
     const summary = {
       total_commits,
@@ -192,6 +194,7 @@ export function gitaiRoutes(db: Database.Database): Router {
       first_time_right_rate,
       total_ai_lines,
       total_human_lines,
+      total_overridden_lines,
     };
 
     // --- agent_pct_over_time (sorted ASC) ---
@@ -262,24 +265,27 @@ export function gitaiRoutes(db: Database.Database): Router {
       .sort((a, b) => b.ai_lines - a.ai_lines);
 
     // --- ai_human_rate_by_day ---
-    const dayMap = new Map<string, { ai_lines: number; human_lines: number }>();
+    const dayMap = new Map<string, { ai_lines: number; human_lines: number; overridden_lines: number }>();
     for (const r of sortedAsc) {
       const day = r.captured_at ? r.captured_at.slice(0, 10) : 'unknown';
-      const entry = dayMap.get(day) ?? { ai_lines: 0, human_lines: 0 };
+      const entry = dayMap.get(day) ?? { ai_lines: 0, human_lines: 0, overridden_lines: 0 };
       entry.ai_lines += r.agent_lines;
       entry.human_lines += r.human_lines;
+      entry.overridden_lines += r.overridden_lines;
       dayMap.set(day, entry);
     }
     const ai_human_rate_by_day = Array.from(dayMap.entries())
       .filter(([day]) => day !== 'unknown')
       .map(([day, d]) => {
-        const total = d.ai_lines + d.human_lines;
+        const total = d.ai_lines + d.human_lines + d.overridden_lines;
         return {
           day,
           ai_lines: d.ai_lines,
           human_lines: d.human_lines,
+          overridden_lines: d.overridden_lines,
           ai_pct: total > 0 ? Math.round(d.ai_lines / total * 1000) / 10 : 0,
           human_pct: total > 0 ? Math.round(d.human_lines / total * 1000) / 10 : 0,
+          overridden_pct: total > 0 ? Math.round(d.overridden_lines / total * 1000) / 10 : 0,
         };
       });
 
