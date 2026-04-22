@@ -71,14 +71,19 @@ function countLinesFromRanges(rangeStr: string): number {
 export function parseGitAiNote(raw: string): ParsedGitAiNote | null {
   if (!raw || !raw.trim()) return null;
 
-  const separatorIndex = raw.indexOf('\n---\n');
+  // Handle notes that start with --- (empty file map, e.g. human-only or deletion-only commits)
+  let separatorIndex = raw.indexOf('\n---\n');
   if (separatorIndex === -1) {
-    log('warn', 'Git AI note missing --- separator', { preview: raw.slice(0, 100) });
-    return null;
+    if (raw.startsWith('---\n')) {
+      separatorIndex = 0;
+    } else {
+      log('warn', 'Git AI note missing --- separator', { preview: raw.slice(0, 100) });
+      return null;
+    }
   }
 
-  const fileSection = raw.slice(0, separatorIndex);
-  const jsonSection = raw.slice(separatorIndex + 5); // skip \n---\n
+  const fileSection = separatorIndex === 0 ? '' : raw.slice(0, separatorIndex);
+  const jsonSection = separatorIndex === 0 ? raw.slice(4) : raw.slice(separatorIndex + 5); // skip ---\n or \n---\n
 
   // Parse file attributions
   const files: GitAiFileAttribution[] = [];

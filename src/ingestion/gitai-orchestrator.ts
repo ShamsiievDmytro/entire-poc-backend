@@ -21,7 +21,21 @@ export async function runGitAiIngestion(db: Database.Database): Promise<GitAiIng
     try {
       const rawNotes = await fetchGitAiNotes(config.GITHUB_OWNER, repo);
 
-      for (const note of rawNotes) {
+      // Incremental: skip commits already in the database
+      // First pass: filter by watermark (uses indexed captured_at column)
+      const latestDate = gitaiRepo.latestCapturedAt(repo);
+      let candidates = rawNotes;
+      if (latestDate) {
+        candidates = rawNotes.filter(n => !n.committedAt || n.committedAt > latestDate);
+      }
+      // Second pass: check remaining by SHA (catches edge cases like same-second commits)
+      const newNotes = candidates.filter(n => !gitaiRepo.existsBySha(n.commitSha));
+
+      if (newNotes.length < rawNotes.length) {
+        log('info', `${repo}: ${rawNotes.length} notes total, ${newNotes.length} new, ${rawNotes.length - newNotes.length} skipped (already ingested)`);
+      }
+
+      for (const note of newNotes) {
         const parsed = parseGitAiNote(note.noteContent);
         if (!parsed) {
           log('warn', `Unparseable Git AI note for ${repo}@${note.commitSha}`);

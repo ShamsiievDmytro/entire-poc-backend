@@ -54,6 +54,12 @@ export function createGitAiRepo(db: Database.Database) {
   `);
 
   const countStmt = db.prepare('SELECT COUNT(*) AS n FROM gitai_commit_attribution');
+  const latestCapturedAtStmt = db.prepare(
+    'SELECT MAX(captured_at) AS latest FROM gitai_commit_attribution WHERE repo = ?'
+  );
+  const existsByShaStmt = db.prepare(
+    'SELECT 1 FROM gitai_commit_attribution WHERE commit_sha = ? LIMIT 1'
+  );
 
   return {
     upsert(row: Omit<GitAiCommitAttributionRow, 'ingested_at'>) {
@@ -76,6 +82,13 @@ export function createGitAiRepo(db: Database.Database) {
     },
     count(): number {
       return (countStmt.get() as { n: number }).n;
+    },
+    latestCapturedAt(repo: string): string | null {
+      const row = latestCapturedAtStmt.get(repo) as { latest: string | null } | undefined;
+      return row?.latest ?? null;
+    },
+    existsBySha(commitSha: string): boolean {
+      return existsByShaStmt.get(commitSha) !== undefined;
     },
   };
 }
