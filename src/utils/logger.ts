@@ -1,9 +1,11 @@
 /**
- * Structured JSON logger utility.
+ * Structured JSON logger utility for the Git AI metrics backend.
  *
  * All output is written to stdout as a single-line JSON object so it can be
- * consumed by log-aggregation pipelines (e.g. Datadog, Loki) without extra
- * parsing configuration.
+ * consumed by log-aggregation pipelines (e.g. Datadog, Loki, ELK) without
+ * extra parsing configuration. Supports info, warn, and error log levels. Updated
+ * 
+ * Here is my new line
  *
  * @module logger
  */
