@@ -202,22 +202,6 @@ export function gitaiRoutes(db: Database.Database): Router {
       captured_at: r.captured_at,
     }));
 
-    // --- attribution_breakdown (sorted ASC, percentages) ---
-    const attribution_breakdown = sortedAsc.map((r) => {
-      const total = r.agent_lines + r.human_lines + r.overridden_lines;
-      return {
-        commit_sha: r.commit_sha,
-        repo: r.repo,
-        ai_pct: total > 0 ? Math.round(r.agent_lines / total * 1000) / 10 : 0,
-        human_pct: total > 0 ? Math.round(r.human_lines / total * 1000) / 10 : 0,
-        overridden_pct: total > 0 ? Math.round(r.overridden_lines / total * 1000) / 10 : 0,
-        agent_lines: r.agent_lines,
-        human_lines: r.human_lines,
-        overridden_lines: r.overridden_lines,
-        captured_at: r.captured_at,
-      };
-    });
-
     // --- by_developer ---
     const devMap = new Map<string, { commits: number; ai: number; human: number; overridden: number }>();
     for (const r of rows) {
@@ -282,7 +266,6 @@ export function gitaiRoutes(db: Database.Database): Router {
     res.json({
       summary,
       agent_pct_over_time,
-      attribution_breakdown,
       by_developer,
       by_model,
       ai_human_rate_by_day,
