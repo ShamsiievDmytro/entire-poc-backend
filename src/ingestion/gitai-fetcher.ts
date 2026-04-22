@@ -38,6 +38,15 @@ export async function fetchGitAiNotes(
 
   const notes: RawGitAiNote[] = [];
 
+  // Step 0: Fetch latest notes and commits from remote
+  try {
+    git(repoPath, ['fetch', 'origin', 'refs/notes/*:refs/notes/*', '--quiet']);
+    git(repoPath, ['fetch', 'origin', '--quiet']);
+    log('info', `Fetched latest notes and commits from origin for ${repo}`);
+  } catch (err) {
+    log('warn', `Could not fetch from origin for ${repo} — using local data`, { error: String(err) });
+  }
+
   // Step 1: List all notes — each line is "<note_blob_sha> <commit_sha>"
   let noteList: string;
   try {
