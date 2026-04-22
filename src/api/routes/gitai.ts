@@ -261,13 +261,27 @@ export function gitaiRoutes(db: Database.Database): Router {
       .map(([layer, d]) => ({ layer, ai_lines: d.ai_lines, human_lines: d.human_lines }))
       .sort((a, b) => b.ai_lines - a.ai_lines);
 
-    // --- human_edit_rate ---
-    const human_edit_rate = sortedAsc.map((r) => ({
-      commit_sha: r.commit_sha,
-      repo: r.repo,
-      human_pct: Math.round((100 - r.agent_percentage) * 10) / 10,
-      captured_at: r.captured_at,
-    }));
+    // --- ai_human_rate_by_day ---
+    const dayMap = new Map<string, { ai_lines: number; human_lines: number }>();
+    for (const r of sortedAsc) {
+      const day = r.captured_at ? r.captured_at.slice(0, 10) : 'unknown';
+      const entry = dayMap.get(day) ?? { ai_lines: 0, human_lines: 0 };
+      entry.ai_lines += r.agent_lines;
+      entry.human_lines += r.human_lines;
+      dayMap.set(day, entry);
+    }
+    const ai_human_rate_by_day = Array.from(dayMap.entries())
+      .filter(([day]) => day !== 'unknown')
+      .map(([day, d]) => {
+        const total = d.ai_lines + d.human_lines;
+        return {
+          day,
+          ai_lines: d.ai_lines,
+          human_lines: d.human_lines,
+          ai_pct: total > 0 ? Math.round(d.ai_lines / total * 1000) / 10 : 0,
+          human_pct: total > 0 ? Math.round(d.human_lines / total * 1000) / 10 : 0,
+        };
+      });
 
     // --- commit_cadence ---
     const commit_cadence: Array<{ commit_sha: string; hours_since_prev: number; captured_at: string | null }> = [];
@@ -290,8 +304,7 @@ export function gitaiRoutes(db: Database.Database): Router {
       attribution_breakdown,
       by_developer,
       by_model,
-      files_by_layer,
-      human_edit_rate,
+      ai_human_rate_by_day,
       commit_cadence,
     });
   });
