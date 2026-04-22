@@ -8,6 +8,8 @@ export interface RawGitAiNote {
   commitSha: string;
   noteContent: string;
   committedAt: string | null;
+  commitAuthor: string | null;
+  commitMessage: string | null;
   diffAdditions: number;
   diffDeletions: number;
 }
@@ -59,12 +61,18 @@ export async function fetchGitAiNotes(
       // Get note content
       const noteContent = git(repoPath, ['notes', '--ref=ai', 'show', commitSha]);
 
-      // Get commit date
+      // Get commit date, author (name <email>), and message
       let committedAt: string | null = null;
+      let commitAuthor: string | null = null;
+      let commitMessage: string | null = null;
       try {
-        committedAt = git(repoPath, ['log', '-1', '--format=%aI', commitSha]);
+        const logOutput = git(repoPath, ['log', '-1', '--format=%aI%n%aN <%aE>%n%s', commitSha]);
+        const [date, author, message] = logOutput.split('\n');
+        committedAt = date || null;
+        commitAuthor = author || null;
+        commitMessage = message || null;
       } catch {
-        log('warn', `Could not get commit date for ${repo}@${commitSha}`);
+        log('warn', `Could not get commit metadata for ${repo}@${commitSha}`);
       }
 
       // Get diff stats (additions/deletions) for accurate human line calculation
@@ -92,7 +100,7 @@ export async function fetchGitAiNotes(
         }
       }
 
-      notes.push({ commitSha, noteContent, committedAt, diffAdditions, diffDeletions });
+      notes.push({ commitSha, noteContent, committedAt, commitAuthor, commitMessage, diffAdditions, diffDeletions });
     } catch (err) {
       log('warn', `Failed to read note for ${repo}@${commitSha}`, { error: String(err) });
     }

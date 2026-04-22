@@ -218,26 +218,9 @@ export function gitaiRoutes(db: Database.Database): Router {
     // --- by_developer ---
     const devMap = new Map<string, { sum: number; count: number }>();
     for (const r of rows) {
-      try {
-        const raw = r.raw_note_json ?? '';
-        const parts = raw.split('\n---\n');
-        let parsed: { prompts?: Record<string, { human_author?: string }> } | null = null;
-        for (let i = parts.length - 1; i >= 0; i--) {
-          const part = parts[i].trim();
-          if (part.startsWith('{')) {
-            parsed = JSON.parse(part) as { prompts?: Record<string, { human_author?: string }> };
-            break;
-          }
-        }
-        if (parsed?.prompts) {
-          const firstPrompt = Object.values(parsed.prompts)[0];
-          const author = firstPrompt?.human_author ?? 'unknown';
-          const existing = devMap.get(author) ?? { sum: 0, count: 0 };
-          devMap.set(author, { sum: existing.sum + r.agent_percentage, count: existing.count + 1 });
-        }
-      } catch {
-        // skip unparseable
-      }
+      const author = r.commit_author ?? 'unknown';
+      const existing = devMap.get(author) ?? { sum: 0, count: 0 };
+      devMap.set(author, { sum: existing.sum + r.agent_percentage, count: existing.count + 1 });
     }
     const by_developer = Array.from(devMap.entries()).map(([author, { sum, count }]) => ({
       author,

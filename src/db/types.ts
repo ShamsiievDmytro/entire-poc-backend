@@ -60,6 +60,10 @@ export interface GitAiCommitAttributionRow {
   human_lines: number;
   agent_percentage: number;
   prompt_id: string | null;
+  commit_author: string | null;
+  commit_message: string | null;
+  diff_additions: number;
+  diff_deletions: number;
   files_touched_json: string | null;
   raw_note_json: string | null;
   captured_at: string | null;

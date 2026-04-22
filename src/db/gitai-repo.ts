@@ -5,16 +5,22 @@ export function createGitAiRepo(db: Database.Database) {
   const upsertStmt = db.prepare(`
     INSERT INTO gitai_commit_attribution
       (repo, commit_sha, agent, model, agent_lines, human_lines, agent_percentage,
-       prompt_id, files_touched_json, raw_note_json, captured_at)
+       prompt_id, commit_author, commit_message, diff_additions, diff_deletions,
+       files_touched_json, raw_note_json, captured_at)
     VALUES
       (@repo, @commit_sha, @agent, @model, @agent_lines, @human_lines, @agent_percentage,
-       @prompt_id, @files_touched_json, @raw_note_json, @captured_at)
+       @prompt_id, @commit_author, @commit_message, @diff_additions, @diff_deletions,
+       @files_touched_json, @raw_note_json, @captured_at)
     ON CONFLICT (repo, commit_sha, agent) DO UPDATE SET
       model = COALESCE(@model, model),
       agent_lines = @agent_lines,
       human_lines = @human_lines,
       agent_percentage = @agent_percentage,
       prompt_id = COALESCE(@prompt_id, prompt_id),
+      commit_author = COALESCE(@commit_author, commit_author),
+      commit_message = COALESCE(@commit_message, commit_message),
+      diff_additions = @diff_additions,
+      diff_deletions = @diff_deletions,
       files_touched_json = COALESCE(@files_touched_json, files_touched_json),
       raw_note_json = COALESCE(@raw_note_json, raw_note_json),
       captured_at = COALESCE(@captured_at, captured_at)
